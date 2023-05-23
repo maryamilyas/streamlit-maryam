@@ -109,24 +109,30 @@ class NetZeroCalculator:
         snowflake_config = st.secrets.connections.snowpark
         
         distance_traveled = transport_data['distance_traveled']
-        manufacturer_name = transport_data['manufacturer_name']
-        manufacturer_name_tuple = tuple(manufacturer_name)
+        #manufacturer_name = transport_data['manufacturer_name']
+        #manufacturer_name_tuple = tuple(manufacturer_name)
+        #commercial_name = transport_data['commercial_name']
+        #commercial_name_tuple = tuple(commercial_name)
 
-        
-        commercial_name = transport_data['commercial_name']
-        commercial_name_tuple = tuple(commercial_name)
-        emission_factory_query = f""" With calculation as (
+        emission_values = []
+        car_quantities = transport_data['car_quantities']
+        for commercial_name, car_data in car_quantities.items():
+            manufacturer_name=car_data['Manufacturer']
+            quantity = car_data['Quantity']
+            emission_factory_query = f"""With calculation as (
                                     select AVG("Ewltp (g/km)") as "VALUE"
                                     from staging.car_emission_data
-                                    where "Mh" in {str(manufacturer_name_tuple).replace(",)", ")")}
-                                    and "Cn" in {str(commercial_name_tuple).replace(",)", ")")}
+                                    where "Mh" = '{manufacturer_name}'
+                                    and "Cn" = '{commercial_name}'
                                     group by "Mh", "Cn")
                                     select AVG("VALUE") as "VALUE"
                                     from calculation"""
-        # Placeholder calculation
-        emission_factor_car = fetch_data_from_snowflake(snowflake_config, emission_factory_query)
-        emission_factor_car=float(emission_factor_car['VALUE'][0])
-        transport_footprint = distance_traveled * (emission_factor_car/1000000)
+            # Placeholder calculation
+            emission_value = fetch_data_from_snowflake(snowflake_config, emission_factory_query)
+            emission_value = (emission_value/1000000)*quantity
+            if not emission_value.empty:
+                emission_values.append(emission_value.iloc[0]['VALUE'])
+        transport_footprint = distance_traveled * sum(emission_values)
 
         return transport_footprint
     def calculate_public_transport_footprint(self, transport_data):
@@ -353,10 +359,6 @@ class NetZeroCalculator:
         # Update the figure's layout
         fig.update_layout(layout)
 
-        # Display the plot
-        
-
-
 
         # Calculate average emissions per category
         average_emissions = np.mean(emissions)
@@ -365,7 +367,7 @@ class NetZeroCalculator:
         comparison = "lower than" if net_zero_footprint < average_emissions else "higher than"
 
         st.subheader("Comparison to Average Emissions")
-        st.write(f"Your net zero footprint ({round(net_zero_footprint,2)} ton CO2) is {comparison} the average emissions in each category.")
+        st.write(f"Your net zero footprint (<span style='color:#38b580'>{round(net_zero_footprint, 2)}</span> tons CO2) is {comparison} the average emissions in each category.", unsafe_allow_html=True)
         st.plotly_chart(fig)
         
         st.subheader("Track Your Competitors Net-Zero Goals")
@@ -377,23 +379,21 @@ class NetZeroCalculator:
         competitors = filtered_data[filtered_data['Company Name'] != 'Your Company']['Company Name'].unique()
 
         # Display the competitor goals
-        show_goals = st.button('Show Competitor Goals')
         if not filtered_data.empty:
-            if show_goals:
-                #for competitor in competitors:
-                    competitor_data = filtered_data[filtered_data['Company Name'] == competitors]
-                    competitor_data = competitor_data[['Company Name', 'Net-Zero Year', 'Near term - Target Status', 'Near term - Target Classification', 'Net-Zero Committed']].reset_index(drop=True).set_index('Company Name') 
-                    #net_zero_year = competitor_data['Net-Zero Year'].values[0]
-                    #near_term_status = competitor_data['Near term - Target Status'].values[0]
-                    #near_term_goal = competitor_data['Near term - Target Classification'].values[0]
-                    st.dataframe(competitor_data)
-                    #st.markdown(f"***{competitor} Goals:***")
-                    #st.write(f"Net-Zero Year Commitment: {net_zero_year}")
-                    #st.write(f"Near Term Goal: {near_term_status}")
-                    #st.write("---")
+            #for competitor in competitors:
+                competitor_data = filtered_data[filtered_data['Company Name'] == competitors]
+                competitor_data = competitor_data[['Company Name', 'Net-Zero Year', 'Near term - Target Status', 'Near term - Target Classification', 'Net-Zero Committed']].reset_index(drop=True).set_index('Company Name') 
+                #net_zero_year = competitor_data['Net-Zero Year'].values[0]
+                #near_term_status = competitor_data['Near term - Target Status'].values[0]
+                #near_term_goal = competitor_data['Near term - Target Classification'].values[0]
+                st.dataframe(competitor_data)
+                #st.markdown(f"***{competitor} Goals:***")
+                #st.write(f"Net-Zero Year Commitment: {net_zero_year}")
+                #st.write(f"Near Term Goal: {near_term_status}")
+                #st.write("---")
         
         else:
-            st.write('No companies found with the selected criteria.')
+            st.write('Your competitors did not report their Net Zero Goals.')
         
         
         # Provide informative text and tips
@@ -553,7 +553,12 @@ def main():
 
     """
     st.markdown("<span style='color:white;font-size:48px'>ACHIEVE </span>  <span style='color:#38b580;font-size:48px'>NET ZERO</span>",unsafe_allow_html=True)
-    st.write("Welcome to our Net Zero Calculator! We understand the importance of tackling climate change and achieving a sustainable future. Our user-friendly tool empowers individuals and organizations to calculate their carbon footprint and explore strategies to reach net zero emissions. Whether you're a business, household, or individual, join us on this journey towards a greener planet by using our calculator to measure, reduce, and offset your carbon footprint. Let's take meaningful action together for a more sustainable tomorrow.")
+    st.write("""Welcome to our Net Zero Calculator! We understand the importance of tackling climate change 
+                and achieving a sustainable future. Our user-friendly tool empowers individuals and organizations
+                to calculate their carbon footprint and explore strategies to reach net zero emissions. 
+                Whether you're a business, household, or individual, join us on this journey towards a greener
+                  planet by using our calculator to measure, reduce, and offset your carbon footprint. 
+                  Let's take meaningful action together for a more sustainable tomorrow!""")
     
     calculator = NetZeroCalculator()
     
@@ -589,9 +594,16 @@ def main():
         #add_tooltip_to_subheader('Energy Usage', 'You can find this information on your annual energy bills')
 
         electricity_consumption = st.number_input("Electricity consumption (MWh per year)", value=65)
-        HFC_refrigent = st.text('Do you own a HFC-refigerator?')
-        HFC_ref_yes = st.checkbox('Yes')
-        HFC_ref_no = st.checkbox('No')
+
+        hfc_ref_option = st.radio('Do you own a HFC-refrigerator?', ('Yes', 'No'),index=1)
+
+        if hfc_ref_option == 'Yes':
+            HFC_ref_yes = True
+            HFC_ref_no = False
+        else:
+            HFC_ref_yes = False
+            HFC_ref_no = True
+
 
 
         
@@ -606,23 +618,27 @@ def main():
         manufacturer_name = st.multiselect("Manufacturer name of the car(s) owned or leased by the company", df_car_brands, default=["BMW AG"])
         manufacturer_name_tuple = tuple(manufacturer_name)
 
-        
-        query_commercial_name = f"""select distinct "Cn"
+        query_commercial_name = f"""select distinct "Cn", "Mh"
                                     from staging.car_emission_data 
                                     where "Mh" in {str(manufacturer_name_tuple).replace(",)", ")")} 
-                                            and "Cn" <> '116D' order by 1""" 
-        df_commercial_name = fetch_data_from_snowflake(snowflake_config, query_commercial_name)
+                                    and "Cn" <> '116D' order by 1""" 
+        df_car_data = fetch_data_from_snowflake(snowflake_config, query_commercial_name)
 
-        commercial_name= st.multiselect("Commercial name of the car(s) owned or leased by the company", df_commercial_name,  default=["116d"])
+        df_commercial_name = df_car_data[['Cn', 'Mh']].drop_duplicates().reset_index(drop=True)
 
-        #fuel_consumption = st.number_input("Fuel consumption (liters per year)", value=1200)
-        
-        distance_traveled = st.number_input("Average Distance traveled (kilometers per year)", value=20000)
+        commercial_name = st.multiselect("Commercial name of the car(s) owned or leased by the company", df_commercial_name['Cn'], default=["116d"])
+
+        car_quantities = {}
+        for commercial in commercial_name:
+            manufacturer = df_commercial_name[df_commercial_name['Cn'] == commercial]['Mh'].values[0]
+            quantity = st.number_input(f"Number of {commercial} cars from {manufacturer}", value=1)
+            car_quantities[commercial] = {'Manufacturer': manufacturer, 'Quantity': quantity}
+        distance_traveled = st.number_input("Average distance traveled (kilometers per year)", value=20000)
 
         st.subheader("Public Transport Data")
-        distance_traveled_tram = st.number_input("Average Distance traveled by tram (kilometers per year)", value=100)
-        distance_traveled_train = st.number_input("Average Distance traveled by train (kilometers per year", value=100)
-        distance_traveled_bus = st.number_input("Average Distance traveled by bus (kilometers per year", value=20)
+        distance_traveled_tram = st.number_input("Average distance traveled by tram (kilometers per year)", value=100)
+        distance_traveled_train = st.number_input("Average distance traveled by train (kilometers per year)", value=100)
+        distance_traveled_bus = st.number_input("Average distance traveled by bus (kilometers per year)", value=20)
 
         #st.subheader("Food Choices")
         #meat_consumption = st.number_input("Meat consumption (kilograms per year)", value=50)
@@ -650,6 +666,7 @@ def main():
         'transport_data': {
             'manufacturer_name':manufacturer_name,
             'commercial_name':commercial_name,
+            'car_quantities': car_quantities,
             'distance_traveled': distance_traveled,
             'distance_traveled_tram' : distance_traveled_tram,
             'distance_traveled_train' : distance_traveled_train,
