@@ -8,7 +8,7 @@ class NetZeroCalculator:
     """
     NetZeroCalculator is a class that performs calculations related to carbon footprint and displays the results.
     """
-    @st.cache_data(ttl=None)
+    #@st.cache_data(ttl=None)
     def __init__(self):
         """
         Initialize all necessary data sources and variables.
