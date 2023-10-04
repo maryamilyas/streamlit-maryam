@@ -1,52 +1,14 @@
-
+from snowflake_connection import fetch_data_from_snowflake
 import streamlit as st
-import plotly.graph_objects as go
 import numpy as np
-import pandas as pd
-from decimal import Decimal
-import matplotlib.pyplot as plt
+import plotly.graph_objects as go
 
-
-import base64
-import snowflake.connector
-import streamlit_toggle as tog
-
-
-@st.cache_data(ttl=None)  # Cache data until app is refreshed
-def fetch_data_from_snowflake(_snowflake_config, query):
-    # Connect to Snowflake
-    conn = snowflake.connector.connect(
-        user=_snowflake_config["user"],
-        password=_snowflake_config["password"],
-        account=_snowflake_config["account"],
-        warehouse=_snowflake_config["warehouse"],
-        database=_snowflake_config["database"],
-        schema=_snowflake_config["schema"],
-    )
-
-    # Execute query to fetch data
-    
-    cursor = conn.cursor()
-    cursor.execute(query)
-
-    # Retrieve column names
-    column_names = [desc[0] for desc in cursor.description]
-
-    # Retrieve rows
-    rows = cursor.fetchall()
-
-    # Close connection
-    conn.close()
-
-    # Create DataFrame
-    df = pd.DataFrame(rows, columns=column_names)
-    return df
 
 class NetZeroCalculator:
     """
     NetZeroCalculator is a class that performs calculations related to carbon footprint and displays the results.
     """
-
+    @st.cache_data(ttl=None)
     def __init__(self):
         """
         Initialize all necessary data sources and variables.
@@ -83,7 +45,6 @@ class NetZeroCalculator:
         # Implement the logic to calculate CO2 emissions based on energy sources and consumption
         snowflake_config = st.secrets.connections.snowpark
         electricity_consumption = energy_usage['electricity_consumption']
-        #natural_gas_consumption = energy_usage['natural_gas_consumption']
         emission_factory_query = f"select value from public.electricity_consumtion_factor_co2 where country like '{hq_location}' and year = 2020"
         emission_factor_electricity = fetch_data_from_snowflake(snowflake_config, emission_factory_query)
         emission_factor_electricity=float(emission_factor_electricity['VALUE'][0])
@@ -91,7 +52,7 @@ class NetZeroCalculator:
         # Store DataFrame in Session State
         st.session_state.emission_factor_electricity = emission_factor_electricity
         # Placeholder calculation
-        energy_footprint = electricity_consumption * emission_factor_electricity #+ natural_gas_consumption * 2
+        energy_footprint = electricity_consumption * emission_factor_electricity 
 
         return energy_footprint
 
@@ -109,10 +70,6 @@ class NetZeroCalculator:
         snowflake_config = st.secrets.connections.snowpark
         
         distance_traveled = transport_data['distance_traveled']
-        #manufacturer_name = transport_data['manufacturer_name']
-        #manufacturer_name_tuple = tuple(manufacturer_name)
-        #commercial_name = transport_data['commercial_name']
-        #commercial_name_tuple = tuple(commercial_name)
 
         emission_values = []
         car_quantities = transport_data['car_quantities']
@@ -157,21 +114,6 @@ class NetZeroCalculator:
 
         return public_transport_footprint
 
-    def calculate_food_footprint(self, food_choices):
-        """
-        Calculate the CO2 emissions based on food choices.
-
-        Args:
-            food_choices (dict): User data for food choices.
-
-        Returns:
-            float: Food footprint in CO2 emissions.
-        """
-        # Implement the logic to calculate CO2 emissions based on food sources and consumption patterns
-        # Placeholder calculation
-        food_footprint = 100
-
-        return food_footprint
 
     def calculate_water_footprint(self, water_usage):
         """
@@ -251,10 +193,7 @@ class NetZeroCalculator:
         """
         hq_country = 'Belgium'
         energy_footprint = self.calculate_energy_footprint(user_data['energy_usage'],hq_location=hq_country)
-        #hq_country = self.general_data(user_data['hq_country'])
-        #business_sector = self.general_data(user_data['business_sector'])
         transport_footprint = self.calculate_transport_footprint(user_data['transport_data'])
-        #food_footprint = self.calculate_food_footprint(user_data['food_choices'])
         public_transport_footprint = self.calculate_public_transport_footprint(user_data['transport_data'])
         water_footprint = self.calculate_water_footprint(user_data['water_usage'])
         waste_footprint = self.calculate_waste_footprint(user_data['waste_data'])
@@ -383,14 +322,8 @@ class NetZeroCalculator:
             #for competitor in competitors:
                 competitor_data = filtered_data[filtered_data['Company Name'] == competitors]
                 competitor_data = competitor_data[['Company Name', 'Net-Zero Year', 'Near term - Target Status', 'Near term - Target Classification', 'Net-Zero Committed']].reset_index(drop=True).set_index('Company Name') 
-                #net_zero_year = competitor_data['Net-Zero Year'].values[0]
-                #near_term_status = competitor_data['Near term - Target Status'].values[0]
-                #near_term_goal = competitor_data['Near term - Target Classification'].values[0]
+
                 st.dataframe(competitor_data)
-                #st.markdown(f"***{competitor} Goals:***")
-                #st.write(f"Net-Zero Year Commitment: {net_zero_year}")
-                #st.write(f"Near Term Goal: {near_term_status}")
-                #st.write("---")
         
         else:
             st.write('Your competitors did not report their Net Zero Goals.')
@@ -430,8 +363,6 @@ class NetZeroCalculator:
 
 
         # Main page content
-        #st.markdown('###### Search for suppliers and their Net-Zero commitments')
-
         # Sector and country selection
         location_index = sorted_countries.index(user_data['general']['hq_country'])
         sector_index = sorted_sector.index(user_data['general']['business_sector'])
@@ -487,217 +418,3 @@ class NetZeroCalculator:
             "8. [EFD - emission factor database](https://www.ipcc-nggip.iges.or.jp/EFDB/find_ef.php?action=detach_filter&refresh=false&filter=prop_regional&fkey=0)\n"
 
 )
-        
-def set_svg_background_image(svg_path):
-    """
-    Set an SVG file as the background image for the Streamlit app.
-    """
-    background_css = f"""
-    <style>
-    body {{
-        background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%"><rect width="100%" height="100%" fill="your-color" /><image xlink:href="{svg_path}" width="100%" height="100%" /></svg>');
-        background-size: cover;
-    }}
-    </style>
-    """
-
-    st.markdown(background_css, unsafe_allow_html=True)
-
-def add_tooltip_to_subheader(subheader_text, tooltip_text):
-    tooltip_html = f'<span class="tooltip">{subheader_text}<span class="tooltiptext">{tooltip_text}</span></span>'
-    tooltip_css = """
-    <style>
-        .tooltip {
-            position: relative;
-            display: inline-block;
-        }
-
-        .tooltiptext {
-            visibility: hidden;
-            width: max-content;
-            background-color: #333;
-            color: #fff;
-            text-align: center;
-            border-radius: 6px;
-            padding: 5px;
-            position: absolute;
-            z-index: 1;
-            bottom: 125%;
-            left: 50%;
-            transform: translateX(-50%);
-            opacity: 0;
-            transition: opacity 0.3s;
-        }
-
-        .tooltip:hover .tooltiptext {
-            visibility: visible;
-            opacity: 1;
-        }
-    </style>
-    """
-
-    st.markdown(tooltip_css, unsafe_allow_html=True)
-    st.markdown(tooltip_html, unsafe_allow_html=True)
-
-
-
-
-# Streamlit app
-def main():
-    """
-    Run the Net Zero Calculator Streamlit app.
-
-    Collects user inputs for energy usage, transport data, food choices, water usage,
-    waste data, forest data, and offset data. Calculates the net zero footprint based on the inputs
-    and displays the results using Streamlit.
-
-    """
-    st.markdown("<span style='color:white;font-size:48px'>ACHIEVE </span>  <span style='color:#38b580;font-size:48px'>NET ZERO</span>",unsafe_allow_html=True)
-    st.write("""Welcome to our Net Zero Calculator! We understand the importance of tackling climate change 
-                and achieving a sustainable future. Our user-friendly tool empowers individuals and organizations
-                to calculate their carbon footprint and explore strategies to reach net zero emissions. 
-                Whether you're a business, household, or individual, join us on this journey towards a greener
-                  planet by using our calculator to measure, reduce, and offset your carbon footprint. 
-                  Let's take meaningful action together for a more sustainable tomorrow!""")
-    
-    calculator = NetZeroCalculator()
-    
-    # Set sidebar layout
-    st.sidebar.title("User Input")
-
-    # Collect user inputs
-    with st.sidebar:
-        snowflake_config = st.secrets.connections.snowpark
-        #query_locations = f"SELECT distinct location FROM staging.COMPANIES_GOALS order by 1"
-        query_locations = f"select distinct country from public.electricity_consumtion_factor_co2 order by 1"
-        df_locations = fetch_data_from_snowflake(snowflake_config, query_locations)
-        # Store DataFrame in Session State
-        st.session_state.df_locations = df_locations
-
-        query_sector = f"SELECT distinct SECTOR FROM staging.COMPANIES_GOALS order by 1"
-        df_sector = fetch_data_from_snowflake(snowflake_config, query_sector)
-        # Store DataFrame in Session State
-        st.session_state.df_locations = df_sector
-
-        query_car_brand = f'select distinct "Mh" from staging.car_emission_data order by 1'
-        df_car_brands = fetch_data_from_snowflake(snowflake_config, query_car_brand)
-        # Store DataFrame in Session State
-        st.session_state.query_car_brand = query_car_brand
-        
-        st.subheader("General Information")
-        hq_country = st.selectbox("Country name of your headquarters", df_locations)
-        business_sector = st.selectbox("Business sector", df_sector)
-        st.markdown("""---""")
-
-        
-        st.subheader("Energy Usage")
-        #add_tooltip_to_subheader('Energy Usage', 'You can find this information on your annual energy bills')
-
-        electricity_consumption = st.number_input("Electricity consumption (MWh per year)", value=65)
-
-        hfc_ref_option = st.radio('Do you own a HFC-refrigerator?', ('Yes', 'No'),index=1)
-
-        if hfc_ref_option == 'Yes':
-            HFC_ref_yes = True
-            HFC_ref_no = False
-        else:
-            HFC_ref_yes = False
-            HFC_ref_no = True
-
-
-
-        
-        #natural_gas_consumption = st.number_input("Natural gas consumption (cubic meters per year)", value=500)
-        
-        st.markdown("""---""")
-        st.subheader("Water Usage")
-        water_consumption = st.number_input("Water consumption (cubic meters per year)", value=74)
-        
-        st.markdown("""---""")
-        st.subheader("Transport Data")
-        manufacturer_name = st.multiselect("Manufacturer name of the car(s) owned or leased by the company", df_car_brands, default=["BMW AG"])
-        manufacturer_name_tuple = tuple(manufacturer_name)
-
-        query_commercial_name = f"""select distinct "Cn", "Mh"
-                                    from staging.car_emission_data 
-                                    where "Mh" in {str(manufacturer_name_tuple).replace(",)", ")")} 
-                                    and "Cn" <> '116D' order by 1""" 
-        df_car_data = fetch_data_from_snowflake(snowflake_config, query_commercial_name)
-
-        df_commercial_name = df_car_data[['Cn', 'Mh']].drop_duplicates().reset_index(drop=True)
-
-        commercial_name = st.multiselect("Commercial name of the car(s) owned or leased by the company", df_commercial_name['Cn'], default=["116d"])
-
-        car_quantities = {}
-        for commercial in commercial_name:
-            manufacturer = df_commercial_name[df_commercial_name['Cn'] == commercial]['Mh'].values[0]
-            quantity = st.number_input(f"Number of {commercial} cars from {manufacturer}", value=1)
-            car_quantities[commercial] = {'Manufacturer': manufacturer, 'Quantity': quantity}
-        distance_traveled = st.number_input("Average distance traveled (kilometers per year)", value=20000)
-
-        st.subheader("Public Transport Data")
-        distance_traveled_tram = st.number_input("Average distance traveled by tram (kilometers per year)", value=100)
-        distance_traveled_train = st.number_input("Average distance traveled by train (kilometers per year)", value=100)
-        distance_traveled_bus = st.number_input("Average distance traveled by bus (kilometers per year)", value=20)
-
-        #st.subheader("Food Choices")
-        #meat_consumption = st.number_input("Meat consumption (kilograms per year)", value=50)
-        #vegetable_consumption = st.number_input("Vegetable consumption (kilograms per year)", value=100)
-        #fruit_consumption = st.number_input("Fruit consumption (kilograms per year)", value=75)
-
-        st.markdown("""---""")
-        st.subheader("Waste Data")
-        waste_production = st.number_input("Waste production (kilograms per year)", value=800)
-
-        st.markdown("""---""")
-
-        st.subheader("Offset Data")
-        offset_amount = st.number_input("Offset amount (tons of CO2 offset)", value=0)
-
-    user_data = {
-        'general': {
-            'hq_country': hq_country,
-            'business_sector': business_sector
-              }, 
-        'energy_usage': {
-            'electricity_consumption': electricity_consumption,
-            'hfc_refrigrator': HFC_ref_yes
-        },  # User data for energy usage
-        'transport_data': {
-            'manufacturer_name':manufacturer_name,
-            'commercial_name':commercial_name,
-            'car_quantities': car_quantities,
-            'distance_traveled': distance_traveled,
-            'distance_traveled_tram' : distance_traveled_tram,
-            'distance_traveled_train' : distance_traveled_train,
-            'distance_traveled_bus' : distance_traveled_bus
-        },  # User data for transport
-        #'food_choices': {
-        #    'meat_consumption': meat_consumption,
-        #    'vegetable_consumption': vegetable_consumption,
-        #    'fruit_consumption': fruit_consumption
-        #},  # User data for food choices
-        'water_usage': {
-            'water_consumption': water_consumption
-        },  # User data for water usage
-        'waste_data': {
-            'waste_production': waste_production
-        },  # User data for waste production and management
-        
-          # User data for forest conservation
-        'offset_data': {
-            'offset_amount': offset_amount
-        }  # User data for emission offset
-    }
-
-    # Calculate net zero footprint
-
-    
-    net_zero_footprint = calculator.calculate_net_zero(user_data)
-
-    # Display the result
-    calculator.display_results(net_zero_footprint, user_data)
-
-
-if __name__ == '__main__':
-    main()
