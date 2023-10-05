@@ -27,7 +27,7 @@ def main():
 
     # Collect user inputs
     with st.sidebar:
-        snowflake_config = st.secrets.connection
+        snowflake_config = st.secrets.connections.snowpark
         query_locations = f"select distinct country from public.electricity_consumtion_factor_co2 order by 1"
         df_locations = fetch_data_from_snowflake(snowflake_config, query_locations)
         # Store DataFrame in Session State
