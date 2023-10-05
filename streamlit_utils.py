@@ -16,6 +16,16 @@ def set_svg_background_image(svg_path):
     st.markdown(background_css, unsafe_allow_html=True)
 
 def add_tooltip_to_subheader(subheader_text, tooltip_text):
+    """
+    Adds a tooltip to a Streamlit subheader.
+
+    Parameters:
+    subheader_text (str): The text to display in the subheader.
+    tooltip_text (str): The text to display in the tooltip.
+
+    Returns:
+    None
+    """
     tooltip_html = f'<span class="tooltip">{subheader_text}<span class="tooltiptext">{tooltip_text}</span></span>'
     tooltip_css = """
     <style>

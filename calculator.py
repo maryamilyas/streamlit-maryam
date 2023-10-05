@@ -335,7 +335,19 @@ class NetZeroCalculator:
         HFC_ref_yes = user_data['energy_usage']['hfc_refrigrator']
         electricity_consumption = user_data['energy_usage']['electricity_consumption']
         distance_traveled = user_data['transport_data']['distance_traveled'] 
+        
         def generate_carbon_footprint_tips(electricity_consumption, HFC_ref_yes, distance_traveled):
+            """
+            This function generates a list of tips to reduce carbon footprint based on the user's inputs.
+
+            Args:
+            - electricity_consumption (int): The amount of electricity consumption in kWh.
+            - HFC_ref_yes (bool): Whether the user's refrigerator uses HFC refrigerant or not.
+            - distance_traveled (int): The distance traveled by the user in miles.
+
+            Returns:
+            - tips (list): A list of tips to reduce carbon footprint based on the user's inputs.
+            """
             tips = [
                     "Choose cloud providers that prioritize renewable energy sources to power their data centers.",
                     "Consider leveraging cloud-based sustainability tools and services that help monitor, analyze, and optimize your cloud resource usage for maximum efficiency and reduced environmental impact.",

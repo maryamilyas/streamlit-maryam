@@ -109,7 +109,7 @@ def main():
         'general': {
             'hq_country': hq_country,
             'business_sector': business_sector
-              }, 
+        },  # User data for country and sector
         'energy_usage': {
             'electricity_consumption': electricity_consumption,
             'hfc_refrigrator': HFC_ref_yes
@@ -129,11 +129,9 @@ def main():
         'waste_data': {
             'waste_production': waste_production
         },  # User data for waste production and management
-        
-          # User data for forest conservation
-        'offset_data': {
+            'offset_data': {
             'offset_amount': offset_amount
-        }  # User data for emission offset
+        }   # User data for emission offset
     }
 
     # Calculate net zero footprint
